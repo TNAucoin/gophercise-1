@@ -2,6 +2,7 @@ package quizer
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"github.com/tnaucoin/gophercise-1/interaction"
@@ -53,12 +54,19 @@ func NewQuizer(path string) *Quizer {
 // ExecuteQuiz loads the quiz data from the specified file path,
 // conducts the quiz by asking questions and collecting answers,
 // and outputs the number of correct answers.
-func (q *Quizer) ExecuteQuiz() {
+func (q *Quizer) ExecuteQuiz(ctx context.Context) {
 	err := q.LoadQuizData(q.QuizFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	q.ConductQuiz()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			q.ConductQuiz()
+		}
+	}
 }
 
 // ConductQuiz conducts the quiz by iterating over each quiz in the Quizer's QuizData.
@@ -82,6 +90,9 @@ func (q *Quizer) ConductQuiz() {
 			q.Correct++
 		}
 	}
+}
+
+func (q *Quizer) DisplayResults() {
 	fmt.Printf("You answered correctly to %d out of %d questions.\n", q.Correct, q.Total)
 }
 
