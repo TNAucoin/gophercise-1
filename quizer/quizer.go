@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -29,6 +30,7 @@ type Quizer struct {
 	QuizFilePath string
 	Total        int
 	Correct      int
+	Out          io.Writer
 }
 
 // New creates a new Quizer object with the given quiz data file path.
@@ -42,9 +44,13 @@ func New(path string) *Quizer {
 		QuizFilePath: path,
 		Total:        0,
 		Correct:      0,
+		Out:          os.Stdout,
 	}
 	if err := q.LoadQuizData(); err != nil {
 		log.Fatal(err)
+	}
+	if q.QuizData == nil {
+		log.Fatal("Your quiz file doesn't contain any questions.")
 	}
 	return q
 }
@@ -64,7 +70,7 @@ func (q *Quizer) ExecuteQuiz(duration int) {
 			}
 			return
 		case <-t.C:
-			fmt.Println("\nTime is up!")
+			fmt.Fprintf(q.Out, "\nTime is up!")
 			return
 		}
 	}
@@ -83,7 +89,7 @@ func (q *Quizer) GatherInput() string {
 // Once all questions have been answered, it signals that the quiz is done by sending a true value to the done channel.
 func (q *Quizer) ConductQuiz(done chan<- bool) {
 	for _, quiz := range q.QuizData {
-		fmt.Printf("What is %s?\n", quiz.Question)
+		fmt.Fprintf(q.Out, "What is %s?\n", quiz.Question)
 		if quiz.IsAnswerCorrect(q.GatherInput()) {
 			q.Correct++
 		}
@@ -94,7 +100,9 @@ func (q *Quizer) ConductQuiz(done chan<- bool) {
 
 // DisplayResults prints the number of questions answered correctly out of the total number of questions in the quiz.
 func (q *Quizer) DisplayResults() {
-	fmt.Printf("You answered correctly to %d out of %d questions.\n", q.Correct, q.Total)
+	if _, err := fmt.Fprintf(q.Out, "You answered correctly to %d out of %d questions.\n", q.Correct, q.Total); err != nil {
+		log.Fatal("failed to print results..")
+	}
 }
 
 // parseQuizData parses the given byte data as CSV and creates an array of QuizData objects.
@@ -108,11 +116,14 @@ func parseQuizData(data []byte) ([]*QuizData, error) {
 		return nil, err
 	}
 	total := len(quizRecords)
-	qd := make([]*QuizData, total)
-	for i, v := range quizRecords {
-		qd[i] = &QuizData{Question: v[0], Answer: v[1]}
+	if total > 0 {
+		qd := make([]*QuizData, total)
+		for i, v := range quizRecords {
+			qd[i] = &QuizData{Question: v[0], Answer: v[1]}
+		}
+		return qd, nil
 	}
-	return qd, nil
+	return nil, nil
 }
 
 // LoadQuizData reads the quiz data from the specified file path and populates the QuizData field of the Quizer instance.
