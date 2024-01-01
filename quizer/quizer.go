@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ type Quizer struct {
 // and sets the Total and Correct fields to zero.
 // If loading the quiz data fails, it logs a fatal error.
 // It returns the created Quizer object.
-func New(path string) *Quizer {
+func New(path string, shuffle bool) *Quizer {
 	q := &Quizer{
 		QuizData:     make([]*QuizData, 0),
 		QuizFilePath: path,
@@ -52,7 +53,17 @@ func New(path string) *Quizer {
 	if q.QuizData == nil {
 		log.Fatal("Your quiz file doesn't contain any questions.")
 	}
+	if shuffle {
+		q.shuffleQuestions()
+	}
 	return q
+}
+
+func (q *Quizer) shuffleQuestions() {
+	rand.NewSource(time.Now().UnixNano())
+	rand.Shuffle(len(q.QuizData), func(i, j int) {
+		q.QuizData[i], q.QuizData[j] = q.QuizData[j], q.QuizData[i]
+	})
 }
 
 // ExecuteQuiz loads the quiz data from the specified file path,
@@ -70,7 +81,8 @@ func (q *Quizer) ExecuteQuiz(duration int) {
 			}
 			return
 		case <-t.C:
-			fmt.Fprintf(q.Out, "\nTime is up!")
+			fmt.Fprintf(q.Out, "\nTime is up!\n")
+			q.DisplayResults()
 			return
 		}
 	}
